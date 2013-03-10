@@ -61,7 +61,7 @@ static monome_devmap_t *map_serial_to_device(const char *serial) {
 
 monome_t *monome_open(const char *dev, ...) {
 	monome_t *monome;
-	monome_devmap_t *m;
+	monome_devmap_t *m, m2;
 
 	va_list arguments;
 	char *serial, *proto;
@@ -73,17 +73,36 @@ monome_t *monome_open(const char *dev, ...) {
 	serial = NULL;
 	m = NULL;
 
+	if( !strncmp(dev, "series://", 9) ) {
+		proto = "series";
+		dev += 9;
+	} else if( !strncmp(dev, "mext://", 7) ) {
+		proto = "mext";
+		dev += 7;
+	} else if( !strncmp(dev, "40h://", 6) ) {
+		proto = "40h";
+		dev += 6;
+	} else {
+		proto = NULL;
+	}
+
 	/* first let's figure out which protocol to use */
-	if( !strstr(dev, "://") ) {
+	if( !strstr(dev, "://") || proto ) {
 		/* assume that the device is a tty...let's probe and see what device
 		   we're dealing with */
 
 		if( !(serial = monome_platform_get_dev_serial(dev)) )
 			return NULL;
 
-		if( (m = map_serial_to_device(serial)) )
-			proto = m->proto;
-		else
+		if( (m = map_serial_to_device(serial)) ) {
+			if( !proto )
+				proto = m->proto;
+			else {
+				m2 = *m;
+				m2.proto = proto;
+				m = &m2;
+			}
+		} else
 			return NULL;
 	} else
 		/* otherwise, we'll assume that what we have is an OSC URL.
